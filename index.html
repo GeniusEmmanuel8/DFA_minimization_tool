@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>DFA Minimization Tool</title>
+
+<style>
+    body {
+        background: #f4f6f9;
+        font-family: Arial, sans-serif;
+        padding: 20px;
+        color: #222;
+    }
+
+    h1 {
+        text-align: center;
+        color: #333;
+    }
+
+    #container {
+        width: 800px;
+        margin: 0 auto;
+        background: white;
+        padding: 20px;
+        border-radius: 10px;
+        box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+    }
+
+    textarea {
+        width: 100%;
+        height: 150px;
+        padding: 10px;
+        margin-bottom: 15px;
+        border-radius: 5px;
+        border: 1px solid #ccc;
+        font-size: 14px;
+    }
+
+    button {
+        padding: 10px 20px;
+        border: none;
+        background: #007bff;
+        color: white;
+        font-size: 14px;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-right: 10px;
+    }
+    button:hover {
+        background: #0056b3;
+    }
+
+    #status {
+        margin-top: 10px;
+        font-weight: bold;
+        color: #444;
+    }
+
+    #stepBox {
+        margin-top: 25px;
+        background: #fafafa;
+        padding: 15px;
+        border-radius: 6px;
+        border: 1px solid #ddd;
+        display: none;
+    }
+
+    .step-title {
+        font-weight: bold;
+        margin-bottom: 5px;
+    }
+
+    #finalDfa {
+        margin-top: 25px;
+        padding: 15px;
+        background: #eef7ff;
+        border: 1px solid #bcdcff;
+        border-radius: 6px;
+        display: none;
+        white-space: pre-wrap;
+        font-family: monospace;
+    }
+
+</style>
+
+</head>
+<body>
+
+<div id="container">
+    <h1>DFA Minimization Tool</h1>
+
+    <label><b>Paste DFA JSON:</b></label>
+    <textarea id="dfaInput" placeholder='{"states": ["q0","q1"], ...}'></textarea>
+
+    <button id="runBtn">Run Minimization</button>
+
+    <div id="status"></div>
+
+   
+    <div id="stepBox">
+        <div class="step-title">Step:</div>
+        <div id="stepContent"></div>
+        <br>
+        <button id="prevBtn">Previous</button>
+        <button id="nextBtn">Next</button>
+    </div>
+
+    
+    <div id="finalDfa"></div>
+
+</div>
+
+<script>
+let steps = [];
+let currentIndex = 0;
+
+// Show step i
+function renderStep(i) {
+    const stepContentEl = document.getElementById("stepContent");
+
+    if (!steps || steps.length === 0) {
+        stepContentEl.innerHTML = "No steps to show.";
+        return;
+    }
+
+    const step = steps[i];
+
+    const action       = step.action ?? "(no action)";
+    const pair         = step.pair ?? ["-", "-"];
+    const reason       = step.reason ?? "";
+    const dependent_on = step.dependent_on ?? [];
+
+    stepContentEl.innerHTML =
+        `<b>Step ${i + 1} of ${steps.length}</b><br><br>
+         <b>Action:</b> ${action}<br>
+         <b>Pair:</b> (${pair[0]}, ${pair[1]})<br>
+         <b>Reason:</b> ${reason}<br>
+         <b>Dependent on:</b> ${JSON.stringify(dependent_on)}`;
+}
+
+// Buttons
+document.getElementById("prevBtn").onclick = () => {
+    if (currentIndex > 0) {
+        currentIndex--;
+        renderStep(currentIndex);
+    }
+};
+
+document.getElementById("nextBtn").onclick = () => {
+    if (currentIndex < steps.length - 1) {
+        currentIndex++;
+        renderStep(currentIndex);
+    }
+};
+
+// API call
+document.getElementById("runBtn").onclick = async () => {
+    const inputText = document.getElementById("dfaInput").value.trim();
+    if (!inputText) {
+        alert("Please paste DFA JSON first.");
+        return;
+    }
+
+    let jsonData;
+    try {
+        jsonData = JSON.parse(inputText);
+    } catch (err) {
+        alert("Invalid JSON format.");
+        return;
+    }
+
+    const statusEl   = document.getElementById("status");
+    const finalDfaEl = document.getElementById("finalDfa");
+    const stepBoxEl  = document.getElementById("stepBox");
+
+    statusEl.innerText = "Running minimization...";
+    finalDfaEl.style.display = "none";
+    stepBoxEl.style.display  = "none";
+
+    try {
+        const response = await fetch("http://127.0.0.1:8000/api/minimize-dfa/", {
+            method: "POST",
+            headers: {"Content-Type": "application/json"},
+            body: JSON.stringify(jsonData)
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            statusEl.innerText = "Error: " + (data.error || "Unknown server error");
+            console.error("Server error:", data);
+            return;
+        }
+
+        // Steps
+        steps = data.steps || [];
+        currentIndex = 0;
+        stepBoxEl.style.display = "block";
+        renderStep(currentIndex);
+
+        // Minimized DFA
+        finalDfaEl.style.display = "block";
+        finalDfaEl.innerText =
+            "Minimized DFA:\n\n" + JSON.stringify(data.minimized_dfa, null, 2);
+
+        statusEl.innerText = "Done.";
+
+    } catch (err) {
+        console.error(err);
+        statusEl.innerText = "Error talking to server.";
+    }
+};
+</script>
