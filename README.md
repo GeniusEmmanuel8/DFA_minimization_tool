@@ -21,3 +21,18 @@ Display the final Minimized DFA in JSON format.
 2. Learn how to apply that knowledge in code.
 3. Break each step in DFA minimization into separate parts so users can follow along.
 4. Learn how DFA equivalence and partitioning works.
+
+
+## Running locally (configuration)
+
+Settings come from environment variables, not from source code:
+
+```bash
+export DJANGO_DEBUG=1                 # local development only
+cd dfatool && python manage.py runserver
+# in another terminal, serve the page (browsers block file:// requests to the API):
+python -m http.server 5500            # then open http://localhost:5500/index.html
+```
+
+For anything other than local use, set `DJANGO_SECRET_KEY` to a long random value, leave `DJANGO_DEBUG` unset, and set `DJANGO_ALLOWED_HOSTS` and `DJANGO_CORS_ORIGINS` for your domain.
+The API accepts DFAs of up to 200 states and 50 symbols.

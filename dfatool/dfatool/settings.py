@@ -19,13 +19,31 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # Quick-start development settings - unsuitable for production
 # See https://docs.djangoproject.com/en/4.2/howto/deployment/checklist/
 
-# SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-8b4+n)fo-$rmks^jr#ih@0s=i=z=#hr1vxhyss%tk=&=w7!%2p"
+# SECURITY: configuration comes from environment variables, never from source code.
+#   DJANGO_SECRET_KEY    required unless DJANGO_DEBUG=1
+#   DJANGO_DEBUG         "1" for local development; anything else means off (default: off)
+#   DJANGO_ALLOWED_HOSTS comma-separated host names (default: localhost,127.0.0.1)
+import os
+from django.core.exceptions import ImproperlyConfigured
+from django.core.management.utils import get_random_secret_key
 
-# SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = os.environ.get("DJANGO_DEBUG", "0") == "1"
 
-ALLOWED_HOSTS = []
+SECRET_KEY = os.environ.get("DJANGO_SECRET_KEY")
+if not SECRET_KEY:
+    if DEBUG:
+        # Throw-away key for local development only (changes on every restart)
+        SECRET_KEY = get_random_secret_key()
+    else:
+        raise ImproperlyConfigured(
+            "Set DJANGO_SECRET_KEY (or DJANGO_DEBUG=1 for local development)."
+        )
+
+ALLOWED_HOSTS = [
+    h.strip()
+    for h in os.environ.get("DJANGO_ALLOWED_HOSTS", "localhost,127.0.0.1").split(",")
+    if h.strip()
+]
 
 
 # Application definition
@@ -122,4 +140,10 @@ STATIC_URL = "static/"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-CORS_ALLOW_ALL_ORIGINS = True   
+# Only local pages may call the API (serve index.html with: python -m http.server 5500).
+# Add more origins with DJANGO_CORS_ORIGINS="https://example.com,https://other.com".
+CORS_ALLOW_ALL_ORIGINS = False
+CORS_ALLOWED_ORIGIN_REGEXES = [r"^http://(localhost|127\.0\.0\.1)(:\d+)?$"]
+CORS_ALLOWED_ORIGINS = [
+    o.strip() for o in os.environ.get("DJANGO_CORS_ORIGINS", "").split(",") if o.strip()
+]
